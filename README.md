@@ -8,4 +8,11 @@ Functional Language Compilation at Harvard on 10/31, ...
 
 The main files are:
 
-* semantics.rkt - semantics of Coq IL
+* `semantics.rkt` - semantics of Coq IL
+
+To write programs in the Coq IL, use the following:
+
+```
+#lang eqil
+```
+

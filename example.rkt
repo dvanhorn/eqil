@@ -1,11 +1,27 @@
-#lang eqil
+#lang eqil/abstract
 
 (let t = (< 11 12 13 >) in
   (let r = (|#| 0 t) in
     (halt r)))
 
+(let k = (λ y (halt y)) in
+  (let i = (λ x y (k x)) in
+    (i 1 2)))
+
+;; ((λ _ (i 1)) (i 0)) in CPS
+(let i = (λ x k (k x))
+  in
+  (let k1 = (λ y (let k2 = (λ z (halt z)) in
+                   (i 1 k2)))
+    in
+    (i 0 k1)))
+
+(let i = (+ (1 2)) in
+  (halt i))
+
 (rec (r = (< 1 2 r >)) in
   (halt r))
+
 
 (rec (r = (< 1 2 r >)) in
   (let x = (|#| 2 r) in

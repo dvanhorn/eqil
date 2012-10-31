@@ -1,6 +1,6 @@
 #lang racket
 (require redex/reduction-semantics)
-(provide step inj recbind EQIL expression?)
+(provide step inj recbind QIL EQIL expression?)
 
 ;; Semantics for Coq IL using store allocated constants
 
@@ -62,9 +62,9 @@
 (define step
   (reduction-relation 
    EQIL #:domain Σ
-   (--> ((X V_0 ..._1) ρ σ)
+   (--> ((X V_0 ...) ρ σ)
         (E ρ_1 σ_1)
-        (where ((λ X_1 ..._1 E) ρ_0) (deref X ρ σ))
+        (where ((λ X_1 ... E) ρ_0) (deref X ρ σ))
         (where (S ...) ((deref V_0 ρ σ) ...))
         (where (ρ_1 σ_1) (bind (X_1 S) ... ρ_0 σ))
         app)
@@ -168,7 +168,6 @@
 
 (define-metafunction EQIL
   reduce : D ρ σ -> S
-  [(reduce C ρ σ) C]
   [(reduce (PRIM (V ...)) ρ σ)
    (∆ PRIM (deref V ρ σ) ...)]   
   [(reduce (|#| I V) ρ σ)
