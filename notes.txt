@@ -1,0 +1,209 @@
+These are notes on the email exchange between me and Greg working out
+the details of the language.
+
+;;
+
+I did the very basics, specialized to the CPS representation that
+we're using.  However, I abstracted a few things early to basically
+get CFA0 out.  For instance, I didn't introduce the allocation and
+time parameters, but rather, just mapped each variable to a single
+location (so effectively, the store is merged into the environment).
+
+But I was getting ready to go back and motivate the reason you want
+to have a more general notion of allocation and context, and details
+about how to do things more efficiently than just computing the
+transitive closure of the reachable states, and then merging the
+abstract stores.
+
+For background:
+
+Our CPS language looks like this:
+
+v ::= x | c
+
+e ::= v(v1,...,vn)
+    | let x = d in e
+    | switch v in {c1 => e1 | ... | cn => en}
+    | halt v
+
+d ::= x = prim(v1,...,vn)
+      x = <v1,...,vn>
+      x = #i v
+      x = \x.e
+      rec d1 ... dn
+
+The intuition is that v classifies "small" values that don't need
+to be allocated (variables, constants -- and hence can be freely
+substituted) and "large" values such as lambdas (closures) and tuples
+are allocated.  To match up with your designs better, I simplified
+this and moved constants to the allocated category as in:
+
+v ::= x
+
+e ::= ... (as before)
+
+d ::= x = c
+    | ... (as before)
+
+Then the abstract machine matches exactly, except of course
+that we don't need a continuation component.
+
+I've abused notation and overloaded variable declarations as
+program points, because we are maintaining a convention that
+each variable has a unique name throughout the code.
+
+;;
+
+
+On Oct 26, 2012, at 9:48 AM, David Van Horn <dvanhorn@ccs.neu.edu> wrote:
+
+> On 10/25/12 2:31 PM, Greg Morrisett wrote:
+>>       x = #i v
+>
+
+Yes.
+
+> This is projection out of a tuple, right?
+>
+>>       rec d1 ... dn
+>
+> What does this mean?
+
+Ahh, technically it's limited to recursive declarations of
+functions and tuples.  Pre-closure conversion, it's limited
+to functions.  So it's (bad) notation for what should really
+be:
+
+   rec x1 = \x1.e1
+       ...
+       xn = \xn.en
+
+Post-closure conversion, we use recursive tuples to build 
+the circular environments, hence we have both:
+
+   rec x1 = \x1.e1
+       ...
+       xn = \xn.en
+
+and
+
+   rec x1 = <v11,...,v1n1>
+       ...
+       xm = <vm1,....,vmnm>
+
+;;
+
+On 10/27/2012 5:17 PM, David Van Horn wrote:
+> On 10/25/12 2:31 PM, Greg Morrisett wrote:
+>>      | switch v in {c1 => e1 | ... | cn => en}
+
+The code is guaranteed not to get stuck from the Coq typing.
+
+> Are the semantics of falling off the end just to get stuck?
+>
+>>        x = \x.e
+>
+> So all functions are in curried form?
+
+At the source level yes, but in the intermediate form, we
+have multi-argument functions.
+
+;;
+
+On 10/27/2012 5:33 PM, David Van Horn wrote:
+> On 10/25/12 2:31 PM, Greg Morrisett wrote:
+>> e ::= v(v1,...,vn)
+>>      | let x = d in e
+> ...
+>>
+>> d ::= x = prim(v1,...,vn)
+>>        x = <v1,...,vn>
+>>        x = #i v
+>>        x = \x.e
+>>        rec d1 ... dn
+>
+>
+> Sorry to keep bothering you, but... isn't there any extra set of binders
+> in these productions?  Should the 'x =' part be dropped in D?
+>
+> David
+
+Yes.
+
+-Greg
+
+;;
+
+I think contracts are relevant and useful for a couple of the
+students.  We have this project (Breeze) where we're using
+contracts heavily, so this would be good.
+
+Ironically, we're *not* using types (though we know the input
+code is well-typed.)  The reason is that CPS translation is not
+generally type-preserving for Coq.  So our terms are undecorated
+and there's really no good way to recover the types, since
+type inference for Coq is wildly, wildly, wildly undecidable.
+
+Let me back up and explain what we're doing and what, from an
+analysis standpoint, would be useful.  
+
+We're taking the output of the Coq extractor as input.  This
+is essentially direct-style code corresponding to what I showed
+you earlier.  However, at the meta-level, we know that (a) it
+type-checks, (b) it terminates without computational effects.
+
+That means that, for instance, it's possible to do CSE on 
+function calls, or all sorts of code motion that would otherwise
+require an effects analysis.  So we want to take advantage of
+this.  For instance, this language is ripe for doing Haskell-style
+deforestation (e.g., (map f) o (map g) => map (f o g).)
+
+One question we're asking is whether this code should be evaluated
+CBV or CB-need.  Both strategies are "legal" in some sense.  So
+one of the projects is looking at starting with CBV, and inserting
+laziness (a la Stephen Chang's thesis).  An alternative would be
+to do a thunking translation, and then do strictness analysis 
+to optimize the thunks/forces out of the code.
+
+Another issue is that extracted Coq code has a lot of useless
+values that flow into and out of data structures, but never
+influence the computation.  This is due to the use of dependent
+types.  For instance, if you define:
+
+  Inductive vector(A:Type) : nat -> Type := 
+  | Nil : vector A 0
+  | Cons : forall n, A -> vector A n -> vector A (1+n).
+
+and then write something like:
+
+  Fixpoint append{A:Type}(n1 n2:nat)(v1:vector A n1) (v2:vector A n2) : 
+    vector A (n1 + n2) := 
+   match v1 in vector A n1 return vector A (n1 + n2) with
+   | Nil => v2
+   | Cons n1' hd tl => Cons n2 hd (append n1' n2 tl v2)
+   end
+
+then you never use the nats, but they show up in the resulting
+code.  Note that the extractor will erase *proofs* and *types*
+(usually) but it won't erase *terms* that are computationally
+irrelevant.  So this comes out (using ML-like notation) looking
+like this:
+
+  datatype 'a vector = Nil of ('a * nat) | Cons (nat * 'a * 'a vector)
+
+  let rec append n1 n2 v1 v2 = 
+    match v1 with
+    | Nil => v2
+    | Cons n1 hd tl => Cons n2 hd (append n1' n2 tl v2)
+
+So a big question is how to do the analysis to get rid of these
+useless terms, or how to at least evaluate them lazily.
+
+Then there are the usual functional programming issues -- e.g.,
+how to do a good job of closure conversion.
+
+Anyway, I suspect that just about anything you want to talk about
+is on target for the class.  We've been trying to keep things
+simple, so we haven't dealt with anything but whole program
+analysis.  Talking about modular analysis and separate compilation
+would be good.  So it's all up to you...
