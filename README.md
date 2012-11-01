@@ -29,3 +29,10 @@ algebraic stepper by adding the keyword `traces` or `stepper`, as in:
 ```
 #lang eqil/abstract traces
 ```
+
+Notes are available.  To make the notes do
+
+```
+raco scribble --pdf notes.scrbl
+```
+to generate `notes.pdf`.
