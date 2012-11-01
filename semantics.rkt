@@ -1,6 +1,6 @@
 #lang racket
 (require redex/reduction-semantics)
-(provide step inj recbind QIL EQIL expression?)
+(provide step inj bind recbind push reduce deref QIL EQIL expression?)
 
 ;; Semantics for Coq IL using store allocated constants
 
@@ -18,9 +18,9 @@
      (halt V))
   
   (D ::=
-     (PRIM (V ...))      ;; Primitive application
+     (PRIM V ...)        ;; Primitive application
      (< V ... >)         ;; Tuple
-     (|#| I V)           ;; Tuple projection
+     (I V)               ;; Tuple projection
      (λ X ... E))        ;; Function
   
   (F ::= ;; Subset of D safe for recursive binding
@@ -56,17 +56,19 @@
   (S ::= ;; Storables
      ((< V ... >) ρ)
      ((λ X ... E) ρ)
-     C))
+     C)
+  
+  ;; Convenience for short patterns
+  (CE (C => E)))
 
 ;; Reduction relation for Coq IL
 (define step
   (reduction-relation 
    EQIL #:domain Σ
-   (--> ((X V_0 ...) ρ σ)
+   (--> ((X_f V ..._1) ρ σ)
         (E ρ_1 σ_1)
-        (where ((λ X_1 ... E) ρ_0) (deref X ρ σ))
-        (where (S ...) ((deref V_0 ρ σ) ...))
-        (where (ρ_1 σ_1) (bind (X_1 S) ... ρ_0 σ))
+        (where ((λ X ..._1 E) ρ_0) (deref X_f ρ σ))
+        (where (ρ_1 σ_1) (bind (X (deref V ρ σ)) ... ρ_0 σ))
         app)
    (--> ((let X = D in E) ρ σ)
         (E ρ_0 σ_0)
@@ -76,13 +78,7 @@
         (E ρ_0 σ_0)
         (where (ρ_0 σ_0) (recbind (X F) ... ρ σ))
         rec)
-   (--> ((switch V in 
-                 (C_0 => E_0)
-                 ...
-                 (C => E)
-                 (C_1 => E_1)
-                 ...)
-         ρ σ)
+   (--> ((switch V in (C_0 => E_0) ... (C => E) (C_1 => E_1) ...) ρ σ)
         (E ρ σ)
         (where C (deref V ρ σ))
         switch)))
@@ -106,8 +102,7 @@
    (ρ_0 σ_0)
    (where (A ...) (alloc* σ X ...))
    (where ρ_0 (extend-env* ρ (X A) ...))
-   (where (S ...) ((F ρ_0) ...))
-   (where σ_0 (extend-sto* σ (A S) ...))])
+   (where σ_0 (extend-sto* σ (A (F ρ_0)) ...))])
 
 (define-metafunction EQIL
   push : X D ρ σ -> (ρ σ)
@@ -168,9 +163,9 @@
 
 (define-metafunction EQIL
   reduce : D ρ σ -> S
-  [(reduce (PRIM (V ...)) ρ σ)
+  [(reduce (PRIM V ...) ρ σ)
    (∆ PRIM (deref V ρ σ) ...)]   
-  [(reduce (|#| I V) ρ σ)
+  [(reduce (I V) ρ σ)
    (deref V_0 ρ_0 σ)
    (where (V_0 ρ_0) (ith (deref V ρ σ) I))]
   [(reduce (< V ... >) ρ σ)
@@ -185,7 +180,8 @@
           ((X_0 A_0) ... (X A) (X_1 A_1) ...)
           ((A_2 S_0) ... (A S) (A_3 S_1) ...))
    S])
-  
+ 
+;; Interpretation for primitve operations
 (define-metafunction EQIL
   ∆ : PRIM C ... -> C
   [(∆ add1 number)
@@ -196,9 +192,10 @@
    ,(+ (term number_1) (term number_2))]
   [(∆ = number_1 number_2)
    ,(if (= (term number_1) (term number_2))
-        0
-        1)]
+        0    ; true
+        1)]  ; false
   [(∆ * number_1 number_2)
    ,(* (term number_1) (term number_2))]
   [(∆ / number_1 number_2)
+   ; Assume this is safe?
    ,(/ (term number_1) (term number_2))])
