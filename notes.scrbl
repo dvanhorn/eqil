@@ -85,7 +85,7 @@ like the natural numbers.
 I use Redex, a domain-specific language for semantics engineering.
 I use Redex all the time and think it's a great tool.  You should
 think of Redex as the scripting language of mechanized metatheory.
-There are multiple papers I've written that I could have written
+There are multiple papers I've written that I could not have written
 without Redex because I simply would not have been able to complete
 the research.  Redex makes it easy to run, test, typeset, and experiment
 with semantic models.
