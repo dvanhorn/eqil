@@ -95,10 +95,10 @@
 (define-metafunction AQIL
   reduce^ : D ρ σ -> SS
   [(reduce^ C ρ σ) {C}]
-  [(reduce^ (PRIM (V ...)) ρ σ)
+  [(reduce^ (PRIM V ...) ρ σ)
    {(∆^ PRIM C ...)}
    (where ((S_0 ... C S_1 ...) ...) ((deref^ V ρ σ) ...))]   
-  [(reduce^ (|#| I V) ρ σ)
+  [(reduce^ (I V) ρ σ)
    (deref^ V_0 ρ_0 σ)
    ;; Non-deterministically choose tuple to dereference
    (where (S_0 ... ((< V_i ... >) ρ_i) S_1 ...) (deref^ V ρ σ))
