@@ -38,7 +38,7 @@
         let)
    (--> ((rec (X = F) ... in E) ρ σ)
         (E ρ_0 σ_0)
-        (where (ρ_0 σ_0) (recbind^ (X F) ... ρ σ)) ; FIXME
+        (where (ρ_0 σ_0) (recbind^ (X F) ... ρ σ))
         rec)
    (--> ((switch V in 
                  (C_0 => E_0)
